@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Estoque</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 10px;
+        }
+        h1 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        input[type="file"], input[type="text"], input[type="number"], button {
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            width: 100%;
+        }
+        button {
+            background-color: #5cb85c;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #4cae4c;
+        }
+        #resultado {
+            margin-top: 10px;
+            background-color: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: left;
+            font-size: 14px;
+        }
+        th {
+            background-color: #f8f8f8;
+        }
+    </style>
+</head>
+<body>
+    <h1>Controle de Estoque</h1>
+    <input type="file" id="fileInput" accept=".csv">
+    
+    <label for="codigoBusca">Buscar pelo Código:</label>
+    <input type="text" id="codigoBusca" placeholder="Digite o código" onkeydown="if(event.key === 'Enter'){buscarProdutoPorCodigo();}">
+    <button onclick="buscarProdutoPorCodigo()">Buscar</button>
+
+    <div id="resultado"></div>
+    <button id="nextButton" style="display:none;" onclick="mostrarProximoProduto()">Próximo Produto</button>
+    <button id="relatorioButton" style="display:none;" onclick="gerarRelatorio()">Gerar Relatório</button>
+    <button id="downloadButton" style="display:none;" onclick="baixarRelatorio()">Baixar Relatório</button>
+
+    <script>
+        let produtos = [];
+        let indexAtual = 0;
+        let relatorio = []; // Para armazenar as alterações
+
+        document.getElementById('fileInput').addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const content = e.target.result;
+                    processCSV(content);
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        function processCSV(data) {
+            const linhas = data.split('\n');
+            produtos = []; // Reseta o array de produtos
+            relatorio = []; // Reseta o relatório
+
+            linhas.forEach(linha => {
+                const [codigoProduto, nomeProduto, quantidade] = linha.split(';');
+                if (codigoProduto && nomeProduto && quantidade) {
+                    produtos.push({
+                        codigo: codigoProduto.trim(),
+                        nome: nomeProduto.trim(),
+                        quantidade: parseInt(quantidade.trim())
+                    });
+                }
+            });
+
+            indexAtual = 0; // Reseta o índice
+            mostrarProduto(); // Mostra o primeiro produto
+            document.getElementById('nextButton').style.display = 'block'; // Exibe o botão "Próximo"
+            document.getElementById('relatorioButton').style.display = 'block'; // Exibe o botão "Gerar Relatório"
+            document.getElementById('downloadButton').style.display = 'block'; // Exibe o botão "Baixar Relatório"
+            alert('Arquivo CSV carregado com sucesso!');
+        }
+
+        function mostrarProduto() {
+            const resultadoDiv = document.getElementById('resultado');
+            resultadoDiv.innerHTML = '';
+
+            if (indexAtual < produtos.length) {
+                const produto = produtos[indexAtual];
+                resultadoDiv.innerHTML = `
+                    <h2>Produto ${indexAtual + 1} de ${produtos.length}</h2>
+                    <p><strong>Código:</strong> ${produto.codigo}</p>
+                    <p><strong>Nome:</strong> ${produto.nome}</p>
+                    <p><strong>Quantidade em estoque:</strong> ${produto.quantidade}</p>
+                    <label for="novaQuantidade">Nova Quantidade:</label>
+                    <input type="number" id="novaQuantidade" placeholder="Digite a nova quantidade" min="0" oninput="validarNumero(this)">
+                    <button onclick="atualizarQuantidade()">Atualizar</button>
+                `;
+            } else {
+                resultadoDiv.innerHTML = 'Não há mais produtos.';
+                document.getElementById('nextButton').style.display = 'none'; // Esconde o botão "Próximo"
+            }
+        }
+
+        function buscarProdutoPorCodigo() {
+            const codigoBusca = document.getElementById('codigoBusca').value.trim();
+            const produtoEncontrado = produtos.find(produto => produto.codigo === codigoBusca);
+
+            if (produtoEncontrado) {
+                indexAtual = produtos.indexOf(produtoEncontrado);
+                mostrarProduto();
+            } else {
+                alert('Produto não encontrado.');
+            }
+        }
+
+        function mostrarProximoProduto() {
+            indexAtual++;
+            mostrarProduto();
+        }
+
+        function atualizarQuantidade() {
+            const novaQuantidade = document.getElementById('novaQuantidade').value;
+            const produtoAtual = produtos[indexAtual];
+
+            if (!novaQuantidade || parseInt(novaQuantidade) < 0) {
+                alert('Por favor, insira uma quantidade válida.');
+                return;
+            }
+
+            if (parseInt(novaQuantidade) !== produtoAtual.quantidade) {
+                relatorio.push({
+                    codigo: produtoAtual.codigo,
+                    nome: produtoAtual.nome,
+                    quantidadeAntiga: produtoAtual.quantidade,
+                    quantidadeNova: parseInt(novaQuantidade)
+                });
+            }
+
+            produtoAtual.quantidade = parseInt(novaQuantidade);
+            alert(`Quantidade do produto ${produtoAtual.codigo} atualizada para: ${novaQuantidade}`);
+        }
+
+        function gerarRelatorio() {
+            if (relatorio.length === 0) {
+                alert('Nenhuma alteração registrada.');
+                return;
+            }
+
+            let relatorioHTML = '<h2>Relatório de Alterações</h2><table><tr><th>Código</th><th>Nome</th><th>Quantidade Antiga</th><th>Nova Quantidade</th></tr>';
+            relatorio.forEach(item => {
+                relatorioHTML += `<tr>
+                    <td>${item.codigo}</td>
+                    <td>${item.nome}</td>
+                    <td>${item.quantidadeAntiga}</td>
+                    <td>${item.quantidadeNova}</td>
+                </tr>`;
+            });
+            relatorioHTML += '</table>';
+
+            document.getElementById('resultado').innerHTML = relatorioHTML;
+        }
+
+        function baixarRelatorio() {
+            if (relatorio.length === 0) {
+                alert('Nenhuma alteração registrada.');
+                return;
+            }
+
+            let csvContent = 'data:text/csv;charset=utf-8,Código;Nome;Quantidade Antiga;Nova Quantidade\n';
+            relatorio.forEach(item => {
+                csvContent += `${item.codigo};${item.nome};${item.quantidadeAntiga};${item.quantidadeNova}\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement('a');
+            link.setAttribute('href', encodedUri);
+            link.setAttribute('download', 'relatorio_alteracoes.csv');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function validarNumero(input) {
+            // Remove qualquer caractere não numérico
+            input.value = input.value.replace(/[^0-9]/g, '');
+        }
+    </script>
+</body>
+</html>
